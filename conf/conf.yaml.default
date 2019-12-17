@@ -1,0 +1,13 @@
+# 监听文件配置
+# 不同项目可重新创建一个配置文件，程序会解析conf文件夹下的所有yaml配置文件
+
+# 报警标题
+title: 测试官网
+# 需要监听的文件绝对路径（多个用,号隔开）
+path: ["/Users/llh/mycode/app/Go/logNotice/*.log"]
+
+# 需要报警的字段（多个用,号隔开）
+level: ["error", "warning"]
+
+# 钉钉通知url
+url: "https://oapi.dingtalk.com/robot/send?access_token=ede75b9ffa088748d9144a1a2714cf7ef124a39d6c5f719afb"
