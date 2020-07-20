@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -25,7 +26,7 @@ const OutTime = 60 * 10
 const IntervalTime = 60
 
 // 正在监听切片
-var listenerList map[uint64]string
+var listenerList *listenerListStruct
 
 // 停止监听通知channel
 var listener chan uint64
@@ -33,19 +34,28 @@ var listener chan uint64
 // 文件读取行数记录
 var lineStore *LogFileStatus
 
+type listenerListStruct struct {
+	listenerList map[uint64]string
+	lock         sync.RWMutex
+}
+
 func main() {
 	// 正在监听的文件inode
-	listenerList = make(map[uint64]string)
+	listenerList = &listenerListStruct{
+		listenerList: make(map[uint64]string),
+	}
 	// 通知文件停止监听的chan
 	listener = make(chan uint64, 1)
-	go func(listener chan uint64, listenerList *map[uint64]string) {
+	go func(listener chan uint64, listenerList *listenerListStruct) {
 		for {
 			inode := <-listener
-			if _, ok := (*listenerList)[inode]; ok {
-				delete(*listenerList, inode)
+			listenerList.lock.Lock()
+			if _, ok := (listenerList.listenerList)[inode]; ok {
+				delete(listenerList.listenerList, inode)
 			}
+			listenerList.lock.Unlock()
 		}
-	}(listener, &listenerList)
+	}(listener, listenerList)
 
 	// 优雅退出，退出时保存文件读取行数记录到文件
 	quit := make(chan os.Signal, 1)
@@ -121,10 +131,13 @@ func regularRun(pathList []string, title string, level []string, url string) {
 		}
 
 		inode := FileInode(fileInfo)
-		if _, ok := listenerList[inode]; ok {
+		listenerList.lock.Lock()
+		if _, ok := listenerList.listenerList[inode]; ok {
+			listenerList.lock.Unlock()
 			continue
 		}
-		listenerList[inode] = file
+		listenerList.listenerList[inode] = file
+		listenerList.lock.Unlock()
 
 		// 文件监听处理方法
 		handler := &Handler{
